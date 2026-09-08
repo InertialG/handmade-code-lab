@@ -1,0 +1,15 @@
+{
+  "name": "handmade-code-lab",
+  "version": "1.0.0",
+  "private": true,
+  "description": "纯手工代码鉴定中心 —— 基于未经同行评审的先进感觉工程学",
+  "type": "module",
+  "scripts": {
+    "dev": "npm --prefix web run dev",
+    "build": "npm --prefix web run build",
+    "test": "npm --prefix web run test",
+    "typecheck": "npm --prefix web run typecheck",
+    "worker:dev": "npm --prefix worker run dev",
+    "worker:deploy": "npm --prefix worker run deploy"
+  }
+}

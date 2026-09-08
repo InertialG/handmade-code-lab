@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>纯手工代码鉴定中心</title>
+    <meta name="description" content="基于未经同行评审的先进感觉工程学，对任意 GitHub 仓库出具毫无法律效力的 AI 参与度报告。" />
+    <link rel="stylesheet" href="./src/style.css" />
+  </head>
+  <body>
+    <div class="sheet">
+      <header>
+        <div class="org">HANDMADE CODE LAB · 编号 HCL-001</div>
+        <h1>纯手工代码鉴定中心</h1>
+        <p class="sub">基于未经同行评审的先进感觉工程学</p>
+      </header>
+
+      <main>
+        <form id="repo-form" autocomplete="off">
+          <label for="repo-input">送检样本</label>
+          <div class="row">
+            <input
+              id="repo-input"
+              name="repo"
+              type="text"
+              placeholder="owner/repo 或 https://github.com/owner/repo"
+              spellcheck="false"
+              required
+            />
+            <button type="submit">开始鉴定</button>
+          </div>
+          <details class="advanced">
+            <summary>高级设置</summary>
+            <label for="pat-input">GitHub Personal Access Token（可选）</label>
+            <input id="pat-input" type="password" placeholder="ghp_…（仅存于本机 localStorage）" spellcheck="false" />
+            <p class="hint">
+              未匿名请求 GitHub API 每小时只有 60 次配额。填入个人 token 可提高上限。
+              token 只保存在你自己的浏览器里，请求时经由本项目的 Worker 代理转发给 github.com，本中心不记录、不落库、也不好奇。
+            </p>
+          </details>
+        </form>
+
+        <p id="error" class="error" hidden></p>
+
+        <section id="stage-progress" hidden>
+          <h2>检测进行中</h2>
+          <pre id="log" class="log"></pre>
+        </section>
+
+        <section id="stage-result" hidden>
+          <div id="result"></div>
+          <div class="actions">
+            <button id="copy-btn" type="button">复制结果</button>
+            <button id="again-btn" type="button">再送检一份</button>
+          </div>
+        </section>
+      </main>
+
+      <footer>
+        本检测采用静态分析、提交考古与主观臆断。结果仅供娱乐；若与事实相符，纯属算法实力。本中心不保存您的代码，也不想看。
+      </footer>
+    </div>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

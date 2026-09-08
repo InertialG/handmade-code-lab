@@ -1,0 +1,10 @@
+name = "handmade-code-lab-proxy"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+
+# 可选：限制允许的前端来源（逗号分隔）。留空或删除即允许任意来源。
+# [vars]
+# ALLOWED_ORIGINS = "https://your-name.github.io"
+
+# GITHUB_TOKEN 属于密钥，不要写进本文件，用：
+#   npx wrangler secret put GITHUB_TOKEN
