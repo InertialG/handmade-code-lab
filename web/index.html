@@ -9,10 +9,17 @@
   </head>
   <body>
     <div class="sheet">
+      <div class="dossier-topbar">
+        <div class="doc-barcode" aria-hidden="true"></div>
+        <div class="doc-meta">
+          <span class="confidential-badge">内部档案 · 绝密核验</span>
+          <span class="serial-no">卷宗号: HCL-2026-X8092</span>
+        </div>
+      </div>
       <header>
-        <div class="org">HANDMADE CODE LAB · 编号 HCL-001</div>
+        <div class="org">HANDMADE CODE LABORATORY · 国家特种感觉工程检验总署监制</div>
         <h1>纯手工代码鉴定中心</h1>
-        <p class="sub">基于未经同行评审的先进感觉工程学</p>
+        <p class="sub">基于未经同行评审的先进感觉工程学 · 毫无法律效力的 AI 纯度化验报告</p>
       </header>
 
       <main>
@@ -29,21 +36,40 @@
             />
             <button type="submit">开始鉴定</button>
           </div>
-          <details class="advanced">
+          <div class="samples">
+            <span class="samples-label">典型样本参考：</span>
+            <button type="button" class="sample-chip" data-repo="torvalds/linux">torvalds/linux <small>(老字号)</small></button>
+            <button type="button" class="sample-chip" data-repo="antfu/contribute">antfu/contribute</button>
+            <button type="button" class="sample-chip" data-repo="octocat/Hello-World">octocat/Hello-World</button>
+          </div>
+          <details id="advanced-details" class="advanced">
             <summary>高级设置</summary>
             <label for="pat-input">GitHub Personal Access Token（可选）</label>
-            <input id="pat-input" type="password" placeholder="ghp_…（仅存于本机 localStorage）" spellcheck="false" />
+            <div class="row">
+              <input id="pat-input" type="password" placeholder="ghp_…（仅当前页面有效）" spellcheck="false" />
+              <button id="check-quota-btn" type="button" class="secondary-btn">核验粮票余额</button>
+            </div>
+            <p id="quota-msg" class="quota-msg" hidden></p>
             <p class="hint">
-              未匿名请求 GitHub API 每小时只有 60 次配额。填入个人 token 可提高上限。
-              token 只保存在你自己的浏览器里，请求时经由本项目的 Worker 代理转发给 github.com，本中心不记录、不落库、也不好奇。
+              匿名请求 GitHub API 每小时只有 60 次配额。填入个人 token 可提高上限（5000 次/小时）。
+              <a href="https://github.com/settings/tokens/new?scopes=&description=HandmadeCodeLab-ReadOnly" target="_blank" rel="noopener noreferrer">点此去 GitHub 户籍科领一张无权限只读粮票</a>。
+              token 仅保留在当前页面内存中，刷新后清除；请求时会经由配置的代理转发给 GitHub。仅向你信任的代理提供 token。
             </p>
           </details>
         </form>
 
-        <p id="error" class="error" hidden></p>
+        <section id="error-card" class="incident-card" hidden>
+          <div class="incident-header">
+            <span id="incident-badge" class="incident-badge">ERR-UNKNOWN</span>
+            <span id="incident-title" class="incident-title">非正常结案呈批表</span>
+          </div>
+          <p id="incident-detail" class="incident-detail"></p>
+          <div id="incident-actions" class="incident-actions"></div>
+        </section>
 
         <section id="stage-progress" hidden>
           <h2>检测进行中</h2>
+          <button id="cancel-btn" type="button">取消鉴定</button>
           <pre id="log" class="log"></pre>
         </section>
 
