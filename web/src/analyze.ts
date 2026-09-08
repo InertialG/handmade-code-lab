@@ -27,6 +27,7 @@ export interface Report {
   extras: ReportExtras;
   sample: SampleInfo;
   ruleCount: number;
+  samplingNote: string;
 }
 
 export interface AnalyzeOptions {
@@ -71,6 +72,7 @@ export function analyze(snap: RepoSnapshot, opts: AnalyzeOptions = {}): Report {
     extras: extras(sha, score),
     sample: sampleInfo(snap),
     ruleCount: rules.length,
+    samplingNote: `${snap.historyComplete === false ? '仅包含最近最多 200 条提交，首次提交与仓库年龄规则已跳过。' : ''}${snap.skippedFiles ? `跳过 ${snap.skippedFiles} 个文件（目录、类型或大小/数量限制）。` : ''}`,
   };
 }
 
@@ -87,6 +89,7 @@ export function reportToText(r: Report): string {
   lines.push(`Margin of error: ${r.extras.marginOfError}`);
   lines.push(`置信区间: ${r.extras.interval}`);
   lines.push('');
+  if (r.samplingNote) lines.push(`采样说明：${r.samplingNote}`);
   lines.push('— 证据 —');
   for (const v of r.verdicts) {
     const sign = v.delta > 0 ? `+${v.delta}` : `${v.delta}`;

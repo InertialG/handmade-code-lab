@@ -25,7 +25,7 @@ export const readmeRatio: Rule = {
     }
     if (ratio > 0.35) {
       return [
-        verdict('readme.ratio', evidence, 'README 解释了每一个按钮，包括那个还没写的按钮', +11),
+        verdict('readme.ratio', evidence, 'README 解释了每一个按钮,包括那个还没想好的按钮', +11),
       ];
     }
     if (ratio > 0.12) {
@@ -54,7 +54,7 @@ export const readmeStyle: Rule = {
         verdict(
           'readme.style',
           `README 含 ${emojiHeads} 个 emoji 标题${featureHead ? '，并具备标准 "## Features" 段落' : ''}`,
-          '结构工整、分节完备、emoji 位置精准。人类写 README 时不会这么冷静',
+          '结构工整、分节完备、emoji 位置精准。人类写 README 时的排版通常靠随缘',
           +9,
         ),
       );
@@ -65,7 +65,7 @@ export const readmeStyle: Rule = {
         verdict(
           'readme.badges',
           `README 顶部悬挂 ${badges} 枚徽章`,
-          '徽章数量超过实际功能数量，这是一种需要被理解的行为，但依然 +7%',
+          '徽章数量超过实际功能数量,像一张贴满贴纸的行李箱,需要被理解',
           +7,
         ),
       );

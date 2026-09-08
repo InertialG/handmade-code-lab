@@ -118,13 +118,13 @@ export function makeSnapshot(
   meta: RepoMeta,
   commits: CommitInfo[],
   files: Map<string, FileEntry>,
-  opts: { skippedFiles?: number; tooLarge?: boolean } = {},
+  opts: { skippedFiles?: number; historyComplete?: boolean } = {},
 ): RepoSnapshot {
   return {
+    historyComplete: opts.historyComplete,
     meta,
     commits,
     files,
     skippedFiles: opts.skippedFiles ?? 0,
-    tooLarge: opts.tooLarge ?? false,
   };
 }

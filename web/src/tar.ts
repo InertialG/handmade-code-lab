@@ -12,14 +12,33 @@ export interface TarEntry {
   data: Uint8Array;
 }
 
+export async function readLimited(stream: ReadableStream<Uint8Array> | null, maxBytes: number): Promise<Uint8Array> {
+  if (!stream) throw new Error('响应没有内容');
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > maxBytes) { await reader.cancel(); throw new Error('样本超过安全大小限制'); }
+      chunks.push(value);
+    }
+  } finally { reader.releaseLock(); }
+  const result = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) { result.set(chunk, offset); offset += chunk.length; }
+  return result;
+}
+
 export async function gunzip(input: Uint8Array): Promise<Uint8Array> {
   if (typeof DecompressionStream === 'undefined') {
     throw new Error('当前运行环境不支持 DecompressionStream，无法解压 tar.gz');
   }
   const ds = new DecompressionStream('gzip');
   const stream = new Blob([input as unknown as BlobPart]).stream().pipeThrough(ds);
-  const buf = await new Response(stream).arrayBuffer();
-  return new Uint8Array(buf);
+  return readLimited(stream, 100 * 1024 * 1024);
 }
 
 const dec = new TextDecoder();
@@ -66,7 +85,8 @@ export function untar(buf: Uint8Array): TarEntry[] {
     }
 
     const dataStart = offset + 512;
-    const dataEnd = Math.min(dataStart + size, buf.length);
+    if (!Number.isSafeInteger(size) || dataStart + size > buf.length) throw new Error('tar 文件已截断或大小无效');
+    const dataEnd = dataStart + size;
     const data = buf.subarray(dataStart, dataEnd);
 
     if (typeflag === 'L') {

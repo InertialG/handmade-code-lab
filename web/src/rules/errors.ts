@@ -15,7 +15,7 @@ export const emptyCatch: Rule = {
       verdict(
         'errors.empty-catch',
         `发现 ${n} 处空的 catch / except: pass`,
-        'AI 通常没这么勇。此处异常被静静地埋葬，且没有立碑，判定为人类行为',
+        'AI 通常没这么勇。此处异常被静静地埋葬,且没有立碑。人类才会如此干脆',
         -Math.min(15, 4 + n * 2),
       ),
     ];
@@ -50,7 +50,7 @@ export const nestedTry: Rule = {
       verdict(
         'errors.nested-try',
         `\`${where}\` 中出现 ${deepest} 层嵌套 try/fallback`,
-        '要么 AI 写的，要么线上真炸过。本中心倾向于前者，但对后者致以敬意',
+        '要么 AI 写的,要么线上真炸过。本中心倾向前者,但对后者致以敬意',
         +8,
       ),
     ];
@@ -77,7 +77,7 @@ export const rustUnwrap: Rule = {
         verdict(
           'errors.rust-unwrap',
           `发现 ${n} 处 \`unwrap()\` / \`expect()\``,
-          'AI 嫌疑下降，项目风险上升。本中心建议您在 panic 之前先备份',
+          'AI 嫌疑下降,项目风险上升。请在 panic 之前先备份,像人类那样未雨绸缪',
           -Math.min(12, 3 + Math.floor(n / 4)),
         ),
       );

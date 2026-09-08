@@ -24,7 +24,7 @@ export const shortMessages: Rule = {
         verdict(
           'commits.short-messages',
           `${short.length}/${cs.length}（${pct(short.length, cs.length)}）条提交信息不超过 4 个字符，例如 "${sample}"`,
-          '一个字都不肯多写：本中心确认屏幕前坐着一个疲惫的人类',
+          '一字不多写,能省则省,像在给每句话付钱。屏幕前坐着一个疲惫的人类',
           -Math.round(6 + ratio * 20),
         ),
       ];
@@ -48,13 +48,13 @@ export const verboseMessages: Rule = {
         verdict(
           'commits.verbose-messages',
           evidence,
-          'AI，或者一位令人不安的专业人士',
+          'AI,或者一位写周报写到肌肉记忆的人类',
           +13,
         ),
       ];
     }
     if (avg > 120) {
-      return [verdict('commits.verbose-messages', evidence, '提交信息篇幅可观，疑似有人代笔', +6)];
+      return [verdict('commits.verbose-messages', evidence, '提交信息篇幅可观。如果每条都这么长,那它一定在替某人完成 KPI', +6)];
     }
     return [verdict('commits.verbose-messages', evidence, '提交信息长度朴素，未见文学野心', -2)];
   },
@@ -76,7 +76,7 @@ export const conventionalCommits: Rule = {
         verdict(
           'commits.conventional',
           evidence,
-          '100% 合规，一次都没有破功。人类会在深夜写下 "fix"，此人没有',
+          '100% 合规。人类总会在某个凌晨两点写下 `fix`,此人显然没有凌晨',
           +12,
         ),
       ];
@@ -85,7 +85,7 @@ export const conventionalCommits: Rule = {
       return [verdict('commits.conventional', evidence, '规范执行良好，但仍留有破绽，判定为受过训练的人类', +4)];
     }
     if (ratio > 0) {
-      return [verdict('commits.conventional', evidence, '规范时有时无，符合真实工程环境', -3)];
+      return [verdict('commits.conventional', evidence, '规范时有时无,像一份时灵时不灵的决心,符合真实工程环境', -3)];
     }
     return [verdict('commits.conventional', evidence, '完全不使用提交规范，本中心表示尊重', -5)];
   },
@@ -152,7 +152,7 @@ export const giantCommits: Rule = {
         verdict(
           'commits.giant',
           `提交 \`${biggest.sha.slice(0, 7)}\` 一次新增 ${add} 行`,
-          '检测仪开始冒烟。人类的手腕在第 900 行就会提出抗议',
+          '检测仪开始冒烟。人类的手腕会在第 900 行提前抗议,此处没有',
           +Math.min(20, 8 + Math.floor(add / 2000)),
         ),
       ];
@@ -184,6 +184,7 @@ export const initialDump: Rule = {
   run(snap) {
     const cs = snap.commits;
     if (cs.length < 2 || snap.files.size === 0) return [];
+    if (snap.historyComplete === false) return [];
     const first = cs[cs.length - 1]!;
     const changed = first.changedFiles;
     if (typeof changed !== 'number') return [];
@@ -294,6 +295,7 @@ export const repoAge: Rule = {
   name: '正在核对仓库年龄',
   run(snap) {
     const cs = snap.commits;
+    if (snap.historyComplete === false) return [];
     if (cs.length === 0 || !snap.meta.createdAt) return [];
     const created = Date.parse(snap.meta.createdAt);
     const first = Date.parse(cs[cs.length - 1]!.date);
@@ -303,6 +305,16 @@ export const repoAge: Rule = {
       0,
       (Date.parse(cs[0]!.date) - first) / 86400000,
     );
+    if (spanDays < 1 && cs.length < 15) {
+      return [
+        verdict(
+          'commits.repo-age',
+          `仓库全部 ${cs.length} 条提交发生在 ${spanDays.toFixed(1)} 天内`,
+          '整个项目诞生于同一天，没有留下任何隔夜后悔的痕迹',
+          +11,
+        ),
+      ];
+    }
     if (minutes < 60 && cs.length < 15) {
       return [
         verdict(
@@ -324,12 +336,36 @@ export const repoAge: Rule = {
   },
 };
 
+export const aiCompletions: Rule = {
+  id: 'commits.ai-completions',
+  name: '正在检索 AI 提交话术',
+  run(snap) {
+    const cs = snap.commits;
+    if (cs.length < 3) return [];
+    const aiish = cs.filter((c) =>
+      /(?:completed|implemented|addressed|please review|let me know|This (?:PR|commit) (?:adds|fixes)|\bdone\.?$)/i.test(c.message),
+    );
+    if (aiish.length === 0) return [];
+    const ratio = aiish.length / cs.length;
+    return [
+      verdict(
+        'commits.ai-completions',
+        `${aiish.length}/${cs.length} 条提交信息用了 AI 式完成语(implemented / addressed / This commit ... / done)`,
+        '真正的开发者提交时会写 "fix bug" 或 "改了一下",不会写 "This commit addresses the issue"。只有向人类汇报时才这么说话',
+        +Math.min(24, Math.max(2, Math.round(ratio * 60))),
+        { highlight: ratio >= 0.3 },
+      ),
+    ];
+  },
+};
+
 export const commitRules: Rule[] = [
   shortMessages,
   verboseMessages,
   conventionalCommits,
   emojiCommits,
   aiCoauthor,
+  aiCompletions,
   giantCommits,
   initialDump,
   commitHours,

@@ -51,5 +51,5 @@ export function parseRepoInput(raw: string): RepoRef | null {
 
 /** 归一化成 `owner/repo` 展示串。 */
 export function formatRepoRef(ref: RepoRef): string {
-  return ref.branch ? `${ref.owner}/${ref.repo}@${ref.branch}` : `${ref.owner}/${ref.repo}`;
+  return ref.branch ? `${ref.owner}/${ref.repo}/tree/${ref.branch}` : `${ref.owner}/${ref.repo}`;
 }

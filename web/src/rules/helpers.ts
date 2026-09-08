@@ -69,6 +69,15 @@ export function verdict(
   return { ruleId, evidence, remark, delta, ...extra };
 }
 
+/** 把所有注释行拼成一段文本，供只关心注释的规则使用。 */
+export function commentText(files: FileEntry[]): string {
+  const out: string[] = [];
+  for (const f of files) {
+    for (const l of f.content.split('\n')) if (isCommentLine(l)) out.push(l);
+  }
+  return out.join('\n');
+}
+
 /** 常见注释行的粗略判定（覆盖 // # /* * -- 五种开头）。 */
 export function isCommentLine(line: string): boolean {
   const t = line.trim();

@@ -1,5 +1,5 @@
 import { filesFromTarEntries, makeSnapshot, MAX_REPO_KB } from './snapshot.ts';
-import { untarGz } from './tar.ts';
+import { readLimited, untarGz } from './tar.ts';
 import type { CommitInfo, RepoMeta, RepoSnapshot } from './types.ts';
 import type { RepoRef } from './parseRepo.ts';
 
@@ -15,6 +15,7 @@ export const PROXY_BASE: string = (
 
 export interface FetchOptions {
   token?: string;
+  signal?: AbortSignal;
   fetchImpl?: typeof fetch;
   onStep?: (msg: string) => void;
 }
@@ -31,7 +32,7 @@ async function getJson<T>(url: string, o: FetchOptions): Promise<T> {
   const f = o.fetchImpl ?? fetch;
   const headers: Record<string, string> = { Accept: 'application/vnd.github+json' };
   if (o.token) headers.Authorization = `Bearer ${o.token}`;
-  const res = await f(url, { headers });
+  const res = await f(url, { headers, signal: AbortSignal.any([...(o.signal ? [o.signal] : []), AbortSignal.timeout(30000)]) });
   if (!res.ok) {
     throw new Error(`GitHub 请求失败：${res.status} ${res.statusText}（${url}）`);
   }
@@ -70,25 +71,27 @@ function toCommit(c: ApiCommit): CommitInfo {
 export async function fetchSnapshot(ref: RepoRef, o: FetchOptions = {}): Promise<RepoSnapshot> {
   const { owner, repo } = ref;
   o.onStep?.('正在调取仓库档案');
-  const info = await getJson<ApiRepo>(apiUrl(`/repos/${owner}/${repo}`), o);
-  const branch = ref.branch ?? info.default_branch;
+  const info = await getJson<ApiRepo>(apiUrl(`/repos/${owner}/${repo}`), o);  const branch = ref.branch ?? info.default_branch;
 
   o.onStep?.('正在进行提交考古');
+  const head = await getJson<ApiCommit>(apiUrl(`/repos/${owner}/${repo}/commits/${encodeURIComponent(branch)}`), o);
+  if (!/^[a-f0-9]{40}$/i.test(head.sha)) throw new Error('GitHub 未返回有效提交 SHA');
   const commits: CommitInfo[] = [];
+  let historyComplete = false;
   for (let page = 1; page <= 2; page++) {
     const batch = await getJson<ApiCommit[]>(
-      apiUrl(`/repos/${owner}/${repo}/commits?sha=${encodeURIComponent(branch)}&per_page=100&page=${page}`),
+      apiUrl(`/repos/${owner}/${repo}/commits?sha=${encodeURIComponent(head.sha)}&per_page=100&page=${page}`),
       o,
-    ).catch(() => [] as ApiCommit[]);
+    );
     commits.push(...batch.map(toCommit));
-    if (batch.length < 100) break;
+    if (batch.length < 100) { historyComplete = true; break; }
   }
 
   const meta: RepoMeta = {
     owner,
     repo,
     branch,
-    sha: commits[0]?.sha ?? branch,
+    sha: head.sha,
     defaultBranch: info.default_branch,
     sizeKb: info.size,
     createdAt: info.created_at,
@@ -97,47 +100,50 @@ export async function fetchSnapshot(ref: RepoRef, o: FetchOptions = {}): Promise
   };
 
   if (info.size > MAX_REPO_KB) {
-    return makeSnapshot(meta, commits, new Map(), { tooLarge: true });
+    throw new Error(`仓库体积 ${(info.size / 1024).toFixed(1)} MB，过大，本中心拒绝收样`);
   }
 
-  // 最近 20 条补齐 additions/deletions；失败即跳过
+  // 最近 20 条补齐 additions/deletions；每批最多 4 个请求，失败则中止报告
   o.onStep?.('正在称量每次提交的重量');
   const recent = commits.slice(0, 20);
-  await Promise.all(
-    recent.map(async (c) => {
-      try {
-        const detail = await getJson<ApiCommit>(
-          apiUrl(`/repos/${owner}/${repo}/commits/${c.sha}`),
-          o,
-        );
-        c.additions = detail.stats?.additions ?? 0;
-        c.deletions = detail.stats?.deletions ?? 0;
-        c.changedFiles = Array.isArray(detail.files) ? detail.files.length : undefined;
-      } catch {
-        /* 跳过 */
-      }
-    }),
-  );
+  for (let start = 0; start < recent.length; start += 4) {
+    await Promise.all(
+      recent.slice(start, start + 4).map(async (c) => {
+        try {
+          const detail = await getJson<ApiCommit>(
+            apiUrl(`/repos/${owner}/${repo}/commits/${c.sha}`),
+            o,
+          );
+          c.additions = detail.stats?.additions ?? 0;
+          c.deletions = detail.stats?.deletions ?? 0;
+          c.changedFiles = Array.isArray(detail.files) ? detail.files.length : undefined;
+        } catch (error) {
+          if (o.signal?.aborted) throw error;
+          throw new Error('提交统计不完整，请稍后重试');
+        }
+      }),
+    );
+  }
   // 首次提交单独补一次，用于"一夜出现"判定
-  const first = commits[commits.length - 1];
+  const first = historyComplete ? commits[commits.length - 1] : undefined;
   if (first && first.changedFiles === undefined) {
     try {
       const detail = await getJson<ApiCommit>(apiUrl(`/repos/${owner}/${repo}/commits/${first.sha}`), o);
       first.additions = detail.stats?.additions ?? 0;
       first.deletions = detail.stats?.deletions ?? 0;
       first.changedFiles = Array.isArray(detail.files) ? detail.files.length : undefined;
-    } catch {
-      /* 跳过 */
-    }
+    } catch { throw new Error('首次提交统计读取失败，请稍后重试'); }
   }
 
   o.onStep?.('正在下载并解压样本');
   const f = o.fetchImpl ?? fetch;
-  const res = await f(tarballUrl(owner, repo, branch));
+  const headers: Record<string, string> = {};
+  if (o.token) headers.Authorization = `Bearer ${o.token}`;
+  const res = await f(tarballUrl(owner, repo, head.sha), { headers, signal: AbortSignal.any([...(o.signal ? [o.signal] : []), AbortSignal.timeout(30000)]) });
   if (!res.ok) throw new Error(`下载 tarball 失败：${res.status} ${res.statusText}`);
-  const gz = new Uint8Array(await res.arrayBuffer());
+  const gz = await readLimited(res.body, 50 * 1024 * 1024);
   const entries = await untarGz(gz);
   const { files, skipped } = filesFromTarEntries(entries);
 
-  return makeSnapshot(meta, commits, files, { skippedFiles: skipped });
+  return makeSnapshot(meta, commits, files, { skippedFiles: skipped, historyComplete });
 }

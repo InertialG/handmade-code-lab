@@ -41,8 +41,8 @@ describe('parseRepoInput', () => {
     }
   });
 
-  it('formatRepoRef 带分支时输出 @branch', () => {
-    assert.equal(formatRepoRef({ owner: 'o', repo: 'r', branch: 'dev' }), 'o/r@dev');
+  it('formatRepoRef 带分支时输出 /tree/branch', () => {
+    assert.equal(formatRepoRef({ owner: 'o', repo: 'r', branch: 'dev' }), 'o/r/tree/dev');
     assert.equal(formatRepoRef({ owner: 'o', repo: 'r', branch: null }), 'o/r');
   });
 });

@@ -6,7 +6,7 @@ const CONFIG_CHECKS: Array<[string, (p: string) => boolean]> = [
   ['ESLint', (p) => /^\.eslintrc|^eslint\.config\./.test(p)],
   ['Prettier', (p) => /^\.prettierrc|^prettier\.config\./.test(p)],
   ['CI workflow', (p) => p.startsWith('.github/workflows/')],
-  ['TypeScript 配置', (p) => /^tsconfig(\..*)?\.json$/.test(p)],
+  ['TypeScript 配置', (p) => /(^|\/)tsconfig(\..*)?\.json$/.test(p)],
 ];
 
 export const configCompleteness: Rule = {
@@ -20,7 +20,7 @@ export const configCompleteness: Rule = {
         verdict(
           'config.completeness',
           `已配置：${present.join('、')}`,
-          '格式化、检查、CI 一应俱全，且互相不打架。这种秩序需要解释',
+          '格式化、检查、CI 一应俱全,且互相不打架。一个人类团队都做不到这种秩序',
           +10,
         ),
       ];
@@ -30,7 +30,7 @@ export const configCompleteness: Rule = {
         verdict(
           'config.completeness',
           `未发现任何工程配置（缺失：${missing.join('、')}）`,
-          '零配置。代码风格由作者的心情统一，人类特征显著',
+          '零配置。代码风格统一靠作者的心情,而心情这种东西,模型没有',
           -10,
         ),
       ];
@@ -70,7 +70,7 @@ export const aiToolArtifacts: Rule = {
       verdict(
         'config.ai-artifacts',
         `检出 ${found.join('、')}`,
-        '检测器陷入伦理思考：被鉴定人为其协作者准备了专门的说明文档，这已经不是嫌疑，这是雇佣关系',
+        '检出 AI 工具配置残留:被鉴定人替它的协作者准备了说明文档。这不是嫌疑,是雇佣关系',
         +Math.min(35, 18 + found.length * 5),
         { highlight: true },
       ),

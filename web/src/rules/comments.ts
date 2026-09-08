@@ -1,5 +1,5 @@
 import type { Rule } from '../types.ts';
-import { countAll, isCommentLine, sourceFiles, totalLines, verdict } from './helpers.ts';
+import { commentText, countAll, countMatches, isCommentLine, sourceFiles, totalLines, verdict } from './helpers.ts';
 
 export const commentDensity: Rule = {
   id: 'comments.density',
@@ -19,20 +19,20 @@ export const commentDensity: Rule = {
         verdict(
           'comments.density',
           evidence,
-          '每一行都被认真解释了一遍，包括 `i++`。人类没有这个耐心',
+          '每一行都被认真解释了一遍,包括 `i++`。人类写注释通常是为了三个月后的自己,而三个月后的自己也不想看',
           +12,
         ),
       ];
     }
     if (ratio > 0.15) {
-      return [verdict('comments.density', evidence, '注释密度偏高，礼貌得可疑', +5)];
+      return [verdict('comments.density', evidence, '注释密度偏高。礼貌本身不可疑,可疑的是每个函数都礼貌得一样', +5)];
     }
     if (ratio < 0.02) {
       return [
         verdict(
           'comments.density',
           evidence,
-          '几乎没有注释：作者相信未来的自己，这是一种非常人类的错觉',
+          '几乎没有注释:作者相信三个月后的自己能看懂。三个月后作者证明了自己不能',
           -6,
         ),
       ];
@@ -51,11 +51,12 @@ export const humanComments: Rule = {
   id: 'comments.human-phrases',
   name: '正在扫描人类活动痕迹',
   run(snap) {
-    const files = sourceFiles(snap);
+    // ponytail: 只扫注释文本，否则会命中代码里的字符串字面量（含本规则自己的词表）
+    const text = commentText(sourceFiles(snap));
     const hits: string[] = [];
     let total = 0;
     for (const p of HUMAN_PHRASES) {
-      const n = countAll(files, new RegExp(p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'));
+      const n = countMatches(text, new RegExp(p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'));
       if (n > 0) {
         total += n;
         hits.push(`"${p}"×${n}`);
@@ -66,7 +67,7 @@ export const humanComments: Rule = {
       verdict(
         'comments.human-phrases',
         `注释中出现 ${hits.slice(0, 5).join('、')}`,
-        '人类活动痕迹：情绪、无力感与求生欲同时出现在同一行注释中',
+        '情绪、无力感与求生欲挤在同一行注释里。模型会在生成代码前把情绪排干净',
         -Math.min(16, 5 + total),
       ),
     ];
@@ -83,11 +84,12 @@ export const aiComments: Rule = {
   id: 'comments.ai-phrases',
   name: '正在检索模型口癖',
   run(snap) {
-    const files = sourceFiles(snap);
+    // ponytail: 只扫注释文本，否则会命中代码里的字符串字面量（含本规则自己的词表）
+    const text = commentText(sourceFiles(snap));
     const hits: string[] = [];
     let total = 0;
     for (const p of AI_PHRASES) {
-      const n = countAll(files, new RegExp(p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'));
+      const n = countMatches(text, new RegExp(p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'));
       if (n > 0) {
         total += n;
         hits.push(`"${p}"×${n}`);
@@ -117,7 +119,7 @@ export const todoMarkers: Rule = {
         verdict(
           'comments.todo',
           '未发现任何 TODO/FIXME',
-          '零 TODO。要么全部做完了，要么从来没打算做。前者不存在',
+          '零 TODO。要么全部做完了,要么从来没打算做——本中心根据经验排除前者',
           +6,
         ),
       ];
@@ -130,6 +132,16 @@ export const todoMarkers: Rule = {
       const first = Date.parse(oldest);
       const last = snap.commits[0] ? Date.parse(snap.commits[0].date) : first;
       days = Math.max(0, Math.round((last - first) / 86400000));
+    }
+    if (days < 1) {
+      return [
+        verdict(
+          'comments.todo',
+          `发现 ${n} 处 TODO/FIXME/XXX/HACK，仓库活跃跨度 ${days} 天`,
+          'TODO 与代码同一天出生，还没来得及被任何人遗忘，不构成人类存在的证据',
+          +Math.min(10, 3 + Math.floor(n / 4)),
+        ),
+      ];
     }
     return [
       verdict(
@@ -159,8 +171,9 @@ export const bilingualComments: Rule = {
       verdict(
         'comments.bilingual',
         `发现 ${mixed} 行中英混杂注释`,
-        '高度自然：一句话里同时出现"这个 cache 会 invalidate 掉"，模型做不到这么放松',
-        -Math.min(14, 4 + Math.floor(mixed / 3)),
+        // ponytail: 中文项目里模型同样中英混写，这条只当弱证据
+        '中英混写读起来很自然，但如今模型也这么写，本中心仅作参考',
+        -Math.min(5, 2 + Math.floor(mixed / 20)),
       ),
     ];
   },

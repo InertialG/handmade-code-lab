@@ -13,7 +13,7 @@ export const testPresence: Rule = {
         verdict(
           'tests.presence',
           `${src.length} 个源文件，0 个测试文件`,
-          '强烈的人类自信：作者已在脑内跑通全部用例',
+          '强烈的人类自信:作者已在脑内跑通全部用例,且从不回看',
           -12,
         ),
       ];
@@ -30,7 +30,7 @@ export const testPresence: Rule = {
     if (ratio > 0.3) {
       return [verdict('tests.presence', evidence, '测试覆盖认真，AI 嫌疑 +4%', +4)];
     }
-    return [verdict('tests.presence', evidence, '有测试，但点到为止，符合人类作息', -2)];
+    return [verdict('tests.presence', evidence, '有测试,但点到为止,像周末的健身计划', -2)];
   },
 };
 
@@ -51,7 +51,7 @@ export const testNaming: Rule = {
         verdict(
           'tests.naming',
           `${tests.length} 个测试文件全部使用 \`${[...suffixes][0]}\` 后缀`,
-          '命名整齐划一，没有一个漏网的 `test2.ts`。可疑的秩序感',
+          '命名整齐划一,没有一个漏网的 `test2.ts`。这种秩序感让人想起流水线',
           +6,
         ),
       ];

@@ -13,7 +13,7 @@ export const longFiles: Rule = {
       verdict(
         'size.long-file',
         `\`${top.path}\` 共 ${top.lines} 行，另有 ${files.length - 1} 个文件超过 800 行`,
-        'Claude 曾试图拆分，但作者拒绝了建议',
+        'Claude 曾试图拆分,但作者拒绝了建议——不过作者可能压根没问过 Claude',
         +7,
       ),
     ];
@@ -78,7 +78,7 @@ export const functionLength: Rule = {
         verdict(
           'size.function-uniform',
           `共识别 ${stats.length} 个函数，平均 ${avg.toFixed(1)} 行，标准差 ${sd.toFixed(1)}`,
-          '函数长度整齐得像流水线产品，AI 嫌疑 +8%',
+          '函数长度整齐得像流水线产品。人类写代码时一会儿困一会儿清醒,长度不该这么均匀',
           +8,
         ),
       );
@@ -136,4 +136,45 @@ export const duplicateBlocks: Rule = {
   },
 };
 
-export const sizeRules: Rule[] = [longFiles, functionLength, duplicateBlocks];
+export const blankLineRatio: Rule = {
+  id: 'size.blank-lines',
+  name: '正在测量空行的社交距离',
+  run(snap) {
+    const files = sourceFiles(snap);
+    if (files.length === 0) return [];
+    let blank = 0;
+    let total = 0;
+    for (const f of files) {
+      for (const l of f.content.split('\n')) {
+        total++;
+        if (!l.trim()) blank++;
+      }
+    }
+    if (total < 30) return [];
+    const ratio = blank / total;
+    const evidence = `空行 ${blank} / 总行 ${total}(${(ratio * 100).toFixed(1)}%)`;
+    if (ratio > 0.28) {
+      return [
+        verdict(
+          'size.blank-lines',
+          evidence,
+          '空行比代码还多。要么在凑行数,要么作者习惯每写三行就喘口气——后者更像人类',
+          -5,
+        ),
+      ];
+    }
+    if (ratio < 0.04) {
+      return [
+        verdict(
+          'size.blank-lines',
+          evidence,
+          '几乎没有任何空行:代码被压缩成一块砖。模型常把「紧凑」误当成「专业」',
+          +6,
+        ),
+      ];
+    }
+    return [];
+  },
+};
+
+export const sizeRules: Rule[] = [longFiles, functionLength, duplicateBlocks, blankLineRatio];

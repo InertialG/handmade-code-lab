@@ -31,7 +31,7 @@ export const pythonPrints: Rule = {
       verdict(
         'langs.python-print',
         `非测试代码中残留 ${n} 处 \`print(\``,
-        '调试用的 print 没有删干净。模型会假装自己一次就写对了',
+        '调试用的 print 没有删干净。模型会假装自己一次就写对,人类则带着调试的疤',
         -Math.min(12, 3 + Math.floor(n / 3)),
       ),
     ];
@@ -52,7 +52,7 @@ export const jsConsole: Rule = {
       verdict(
         'langs.js-console',
         `发现 ${n} 处 \`console.log\` 类调用`,
-        '现场遗留了照明设备，说明有人曾在黑暗中摸索过',
+        '现场遗留了照明设备:有人在黑暗中摸索过,而且是摸完就走',
         -Math.min(12, 3 + Math.floor(n / 4)),
       ),
     ];
@@ -82,7 +82,7 @@ export const tsAny: Rule = {
       verdict(
         'langs.ts-any',
         `\`any\` 出现 ${n} 次（${per1k.toFixed(1)}/千行）`,
-        '每一个 any 都是一次公开投降，具有强烈的人类气息',
+        '每一个 any 都是一次公开投降,后面通常跟着一句 TODO。模型会把 any 藏得很好',
         -Math.min(12, 2 + Math.floor(per1k)),
       ),
     ];
@@ -115,4 +115,35 @@ export const langMix: Rule = {
   },
 };
 
-export const langRules: Rule[] = [goErrRitual, pythonPrints, jsConsole, tsAny, langMix];
+const MAGIC_SCOPE = ['js', 'jsx', 'ts', 'tsx', 'mjs', 'cjs', 'py', 'go', 'rs'];
+
+const MAGIC_ANNOTATED = /\b(?:const|let|var|private|public|protected)\s+[A-Za-z_$][\w$]*\s*=\s*(?:0x[0-9a-fA-F]+|\d{3,})\b/g;
+
+export const magicNumbers: Rule = {
+  id: 'langs.magic-numbers',
+  name: '正在追捕裸奔的魔法数字',
+  run(snap) {
+    const files = sourceFiles(snap).filter((f) => MAGIC_SCOPE.includes(f.ext));
+    if (files.length === 0) return [];
+    let n = 0;
+    let sample = '';
+    for (const f of files) {
+      const m = MAGIC_ANNOTATED.exec(f.content);
+      if (m) {
+        n++;
+        if (!sample) sample = `${f.path}: ${m[0]!.trim()}`;
+      }
+    }
+    if (n === 0) return [];
+    return [
+      verdict(
+        'langs.magic-numbers',
+        `发现 ${n} 处魔法数字,例如 \`${sample}\``,
+        '每个 86400 背后都有一段不想解释的过去。模型会贴心地命名 TIME_OF_DAY_IN_SECONDS,人类直接写 86400',
+        -Math.min(12, 3 + Math.floor(n / 2)),
+      ),
+    ];
+  },
+};
+
+export const langRules: Rule[] = [goErrRitual, pythonPrints, jsConsole, tsAny, magicNumbers, langMix];

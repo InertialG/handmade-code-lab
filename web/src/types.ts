@@ -33,7 +33,7 @@ export interface RepoMeta {
   repo: string;
   /** 实际检测的分支 */
   branch: string;
-  /** 用于缓存与种子的 sha（通常是 HEAD 提交 sha，取不到时退化为分支名） */
+  /** 用于缓存与种子的 sha（固定的 HEAD 提交 SHA） */
   sha: string;
   defaultBranch: string;
   /** GitHub 报告的仓库体积，单位 KB */
@@ -49,8 +49,7 @@ export interface RepoSnapshot {
   files: Map<string, FileEntry>;
   /** 因为体积/数量限制被跳过的文件数，仅用于展示 */
   skippedFiles: number;
-  /** 是否因为仓库过大而没有下载代码 */
-  tooLarge: boolean;
+  historyComplete?: boolean;
 }
 
 export interface Verdict {
