@@ -26,9 +26,13 @@ jobs:
         with:
           node-version: 22
       - name: Install
-        run: npm install
+        run: npm ci
+      - name: Install Worker dependencies
+        run: npm ci --prefix ../worker
+      - name: Typecheck
+        run: npm run typecheck && npm run typecheck:test && npm --prefix ../worker run typecheck
       - name: Test
-        run: npm test
+        run: npm test && npm --prefix ../worker test
       - name: Build
         env:
           # Pages 子路径：https://<user>.github.io/<repo>/

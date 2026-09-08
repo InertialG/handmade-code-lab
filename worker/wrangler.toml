@@ -6,5 +6,4 @@ compatibility_date = "2024-11-01"
 # [vars]
 # ALLOWED_ORIGINS = "https://your-name.github.io"
 
-# GITHUB_TOKEN 属于密钥，不要写进本文件，用：
-#   npx wrangler secret put GITHUB_TOKEN
+# 不配置 GITHUB_TOKEN；代理只转发用户当前请求的 Authorization。

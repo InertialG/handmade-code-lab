@@ -5,7 +5,7 @@
 输入任意 GitHub 仓库地址，本中心将一本正经地列出一批完全不构成证据的"证据"，
 并给出精确到小数点后一位的 **AI 参与度**。
 
-- 不接任何模型。全部结论来自 **42 条确定性规则**，同一个 commit 永远得到同一个分数。
+- 不接任何模型。全部结论来自 **47 条确定性规则**,相同完整快照与相同规则版本得到相同分数。
 - 全部分析在你的浏览器里完成。仓库代码不上传、不落库，本中心也不想看。
 - Cloudflare Worker 只做一件事：转发 GitHub 的请求并补上 CORS 头。
 
@@ -62,8 +62,8 @@ cd ../web && VITE_PROXY_BASE=http://127.0.0.1:8787 npm run dev
 所以直接用了内置实现，tar 解析（`src/tar.ts`）不到一百行自己写。
 构建与测试也做了降级路径：**装了 Vite 就用 Vite 打包，没装就用 `tsc` 直出原生 ESM**
 （本项目没有任何裸模块导入，浏览器 `<script type="module">` 可以直接跑）；
-测试统一使用 Node 内置的 `node:test` + `--experimental-strip-types`，因此
-`npm run build` 和 `npm test` 在完全没有 `node_modules` 的环境里也能通过。
+测试统一使用 Node 内置的 `node:test` + `--experimental-strip-types`，因此 `npm test` 无需安装依赖；构建的降级路径仍要求全局可用的 TypeScript 编译器。
+推荐使用 Node 22.18+ 并在 web、worker 目录分别执行 `npm ci`。
 
 ## 部署
 
@@ -75,7 +75,6 @@ cd ../web && VITE_PROXY_BASE=http://127.0.0.1:8787 npm run dev
 ```bash
 cd worker
 npx wrangler deploy
-npx wrangler secret put GITHUB_TOKEN   # 可选
 ```
 
 细节见 [`worker/README.md`](worker/README.md)。
@@ -130,3 +129,11 @@ delta 建议范围：普通信号 ±3~12，强信号 ±15~20，直接命中（�
 
 本检测采用静态分析、提交考古与主观臆断。结果仅供娱乐；若与事实相符，纯属算法实力。
 本中心不保存您的代码，也不想看。
+
+## 安全与采样边界
+
+代理不使用部署者的 GitHub Token，不缓存响应，只开放仓库元数据和提交读取接口。
+用户 PAT 仅保留在当前页面内存中；私有仓库请求仍会经过配置的代理。
+报告不持久保存，升级时清理旧版本存储的 PAT 与报告。
+代码和提交历史固定到同一 SHA；最多采样 200 条提交，历史不完整时跳过首次提交与仓库年龄规则。
+下载上限为 50 MiB，解压上限为 100 MiB；超限中止处理。
