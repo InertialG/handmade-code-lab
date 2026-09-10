@@ -1,5 +1,5 @@
 import type { Rule } from '../types.ts';
-import { countAll, isTestPath, sourceFiles, totalLines, verdict } from './helpers.ts';
+import { countAll, countMatches, isTestPath, sourceFiles, totalLines, verdict } from './helpers.ts';
 
 export const goErrRitual: Rule = {
   id: 'langs.go-err',
@@ -117,7 +117,8 @@ export const langMix: Rule = {
 
 const MAGIC_SCOPE = ['js', 'jsx', 'ts', 'tsx', 'mjs', 'cjs', 'py', 'go', 'rs'];
 
-const MAGIC_ANNOTATED = /\b(?:const|let|var|private|public|protected)\s+[A-Za-z_$][\w$]*\s*=\s*(?:0x[0-9a-fA-F]+|\d{3,})\b/g;
+// ponytail: 不带 g 标志。模块级 g 正则跨文件复用 exec 会残留 lastIndex，漏掉后续文件
+const MAGIC_ANNOTATED = /\b(?:const|let|var|private|public|protected)\s+[A-Za-z_$][\w$]*\s*=\s*(?:0x[0-9a-fA-F]+|\d{3,})\b/;
 
 export const magicNumbers: Rule = {
   id: 'langs.magic-numbers',
@@ -130,7 +131,7 @@ export const magicNumbers: Rule = {
     for (const f of files) {
       const m = MAGIC_ANNOTATED.exec(f.content);
       if (m) {
-        n++;
+        n += countMatches(f.content, MAGIC_ANNOTATED);
         if (!sample) sample = `${f.path}: ${m[0]!.trim()}`;
       }
     }

@@ -2,6 +2,7 @@ import { filesFromTarEntries, makeSnapshot, MAX_REPO_KB } from './snapshot.ts';
 import { readLimited, untarGz } from './tar.ts';
 import type { CommitInfo, RepoMeta, RepoSnapshot } from './types.ts';
 import type { RepoRef } from './parseRepo.ts';
+import type { Report } from './analyze.ts';
 
 /**
  * Worker 代理地址。构建时通过 VITE_PROXY_BASE 注入；
@@ -12,6 +13,11 @@ export const PROXY_BASE: string = (
   (globalThis as unknown as { __HCL_PROXY_BASE__?: string }).__HCL_PROXY_BASE__ ??
   ''
 ).replace(/\/$/, '');
+
+/** 构建时设 VITE_SERVER_REPORT=1：由节点克隆并出报告（见 server/），浏览器只收结果。 */
+export const SERVER_REPORT: boolean = Boolean(
+  (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_SERVER_REPORT,
+);
 
 export interface FetchOptions {
   token?: string;
@@ -67,11 +73,33 @@ function toCommit(c: ApiCommit): CommitInfo {
   };
 }
 
+/** 服务端出报告模式。不带 token：节点只克隆公开仓库，用不上。 */
+export async function fetchReport(ref: RepoRef, o: FetchOptions = {}): Promise<Report> {
+  const f = o.fetchImpl ?? fetch;
+  const q = ref.branch ? `?branch=${encodeURIComponent(ref.branch)}` : '';
+  const res = await f(`${PROXY_BASE}/report/${ref.owner}/${ref.repo}${q}`, {
+    signal: AbortSignal.any([...(o.signal ? [o.signal] : []), AbortSignal.timeout(120000)]),
+  });
+  if (!res.ok) throw new Error(`鉴定服务返回 ${res.status}：${await res.text()}`);
+  return (await res.json()) as Report;
+}
+
+/** 按卷宗号取存档；404 表示档案室没有。 */
+export async function fetchCase(caseId: string, signal?: AbortSignal): Promise<Report> {
+  const res = await fetch(`${PROXY_BASE}/case/${encodeURIComponent(caseId)}`, { signal });
+  if (!res.ok) throw new Error(`鉴定服务返回 ${res.status}：${await res.text()}`);
+  return (await res.json()) as Report;
+}
+
 /** 完整抓取流程；纯 IO，分析部分见 analyze.ts。 */
 export async function fetchSnapshot(ref: RepoRef, o: FetchOptions = {}): Promise<RepoSnapshot> {
   const { owner, repo } = ref;
   o.onStep?.('正在调取仓库档案');
-  const info = await getJson<ApiRepo>(apiUrl(`/repos/${owner}/${repo}`), o);  const branch = ref.branch ?? info.default_branch;
+  const info = await getJson<ApiRepo>(apiUrl(`/repos/${owner}/${repo}`), o);
+  if (info.size > MAX_REPO_KB) {
+    throw new Error(`仓库体积 ${(info.size / 1024).toFixed(1)} MB，过大，本中心拒绝收样`);
+  }
+  const branch = ref.branch ?? info.default_branch;
 
   o.onStep?.('正在进行提交考古');
   const head = await getJson<ApiCommit>(apiUrl(`/repos/${owner}/${repo}/commits/${encodeURIComponent(branch)}`), o);
@@ -99,13 +127,9 @@ export async function fetchSnapshot(ref: RepoRef, o: FetchOptions = {}): Promise
     language: info.language,
   };
 
-  if (info.size > MAX_REPO_KB) {
-    throw new Error(`仓库体积 ${(info.size / 1024).toFixed(1)} MB，过大，本中心拒绝收样`);
-  }
-
-  // 最近 20 条补齐 additions/deletions；每批最多 4 个请求，失败则中止报告
+  // ponytail: 只补最近 5 条的 additions/deletions。20 条要 20 个请求，匿名配额一小时只够跑两次
   o.onStep?.('正在称量每次提交的重量');
-  const recent = commits.slice(0, 20);
+  const recent = commits.slice(0, 5);
   for (let start = 0; start < recent.length; start += 4) {
     await Promise.all(
       recent.slice(start, start + 4).map(async (c) => {

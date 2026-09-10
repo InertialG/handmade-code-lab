@@ -35,6 +35,7 @@ describe('端到端 smoke', () => {
     assert.equal(report.composition.length, 6);
     assert.ok(Math.abs(report.composition.reduce((n, c) => n + c.percent, 0) - 100) < 0.051);
     assert.equal(report.repo, 'octocat/sample-repo');
+    assert.equal(report.caseId, 'HCL-0F1E2D3C4B');
     assert.equal(report.sample.files, 7);
     assert.ok(report.sample.lines > 0);
     assert.equal(report.sample.commits, 3);
@@ -65,7 +66,6 @@ describe('端到端 smoke', () => {
     const snap = await buildSnapshot();
     const report = analyze(snap);
     // 这个数字会随规则调整而变化；改动规则时请一并更新，并确认变化是你想要的。
-    assert.equal(typeof report.score, 'number');
-    assert.equal(report.score, analyze(snap).score);
+    assert.equal(report.score, 11);
   });
 });

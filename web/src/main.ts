@@ -1,5 +1,5 @@
 import { analyze, reportToText, type Report } from './analyze.ts';
-import { fetchSnapshot } from './github.ts';
+import { fetchCase, fetchReport, fetchSnapshot, SERVER_REPORT } from './github.ts';
 import { formatRepoRef, parseRepoInput } from './parseRepo.ts';
 import { rules } from './rules/index.ts';
 
@@ -22,6 +22,7 @@ const checkQuotaBtn = $<HTMLButtonElement>('#check-quota-btn');
 const quotaMsg = $<HTMLElement>('#quota-msg');
 const copyBtn = $<HTMLButtonElement>('#copy-btn');
 const againBtn = $<HTMLButtonElement>('#again-btn');
+const serialNo = $<HTMLElement>('.serial-no');
 
 let current: Report | null = null;
 let running = false;
@@ -64,6 +65,14 @@ function getStampConfig(score: number): { text: string; className: string } {
 
 function renderReport(r: Report): void {
   current = r;
+  serialNo.textContent = `卷宗号: ${r.caseId}`;
+  // 服务端模式下卷宗已存档，地址换成卷宗号：刷新只取档，不复跑
+  if (SERVER_REPORT) {
+    const url = new URL(location.href);
+    url.searchParams.delete('repo');
+    url.searchParams.set('case', r.caseId);
+    history.replaceState(null, '', url);
+  }
   const stampCfg = getStampConfig(r.score);
   const rows = r.composition
     .map(
@@ -117,7 +126,7 @@ function renderReport(r: Report): void {
       <div class="signatures">
         <div>主检鉴定师：<b>${escapeHtml(r.extras.inspector)}</b></div>
         <div>技术复核：<b>赵工（感觉工程所）</b></div>
-        <div>出证日期：<b>${new Date().toISOString().slice(0, 10)}</b></div>
+        <div>出证日期：<b>${escapeHtml(r.issuedAt ?? new Date().toISOString().slice(0, 10))}</b></div>
       </div>
       <div class="official-seal" aria-hidden="true">
         <span>检验专用章</span>
@@ -327,21 +336,25 @@ async function run(raw: string): Promise<void> {
   }
 
   const url = new URL(location.href);
+  url.searchParams.delete('case');
   url.searchParams.set('repo', formatRepoRef(ref));
   history.replaceState(null, '', url);
 
   log(`受理样本：${formatRepoRef(ref)}`);
   try {
-    const token = tokenInput.value.trim() || undefined;
-    const snap = await fetchSnapshot(ref, { token, signal: task.signal, onStep: (m) => log(`${m}……`) });
-
     const perRuleDelay = Math.min(60, Math.floor(2400 / Math.max(rules.length, 1)));
     const pending: string[] = [];
-    const report = analyze(snap, {
-      onProgress: (name, i) => {
-        pending.push(`${String(i + 1).padStart(2, '0')} ${name}……`);
-      },
-    });
+    const progress = (name: string, i: number) => pending.push(`${String(i + 1).padStart(2, '0')} ${name}……`);
+    let report: Report;
+    if (SERVER_REPORT) {
+      log('正在克隆样本并送交后台化验……');
+      report = await fetchReport(ref, { signal: task.signal });
+      rules.forEach((r, i) => progress(r.name, i));
+    } else {
+      const token = tokenInput.value.trim() || undefined;
+      const snap = await fetchSnapshot(ref, { token, signal: task.signal, onStep: (m) => log(`${m}……`) });
+      report = analyze(snap, { onProgress: progress });
+    }
     for (const line of pending) {
       task.signal.throwIfAborted();
       log(line);
@@ -430,8 +443,14 @@ checkQuotaBtn.addEventListener('click', async () => {
   }
 });
 
-const initial = new URL(location.href).searchParams.get('repo');
-if (initial) {
-  input.value = initial;
-  start(initial);
+// ?repo= 只预填，不自动开跑：GET 不该触发一次克隆。?case= 只取档。
+const params = new URL(location.href).searchParams;
+const initialRepo = params.get('repo');
+if (initialRepo) input.value = initialRepo;
+const initialCase = params.get('case');
+if (initialCase && SERVER_REPORT) {
+  fetchCase(initialCase).then((r) => {
+    input.value = r.repo;
+    renderReport(r);
+  }).catch((e) => handleException(e, initialCase, false));
 }

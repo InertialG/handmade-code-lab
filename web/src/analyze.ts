@@ -15,6 +15,10 @@ import {
 import type { RepoSnapshot, Verdict } from './types.ts';
 
 export interface Report {
+  /** 卷宗号，由 HEAD sha 派生，同一提交永远同号 */
+  caseId: string;
+  /** 出证日期，由存档方写入；未存档时前端用当天 */
+  issuedAt?: string;
   repo: string;
   branch: string;
   sha: string;
@@ -33,6 +37,10 @@ export interface Report {
 export interface AnalyzeOptions {
   /** 每跑完一条规则回调一次，用于打印进度行 */
   onProgress?: (name: string, index: number, total: number) => void;
+}
+
+export function caseIdOf(sha: string): string {
+  return `HCL-${sha.slice(0, 10).toUpperCase()}`;
 }
 
 /** 纯函数：同一个 snapshot 必然得到完全相同的 Report。 */
@@ -60,6 +68,7 @@ export function analyze(snap: RepoSnapshot, opts: AnalyzeOptions = {}): Report {
   const sha = snap.meta.sha || `${snap.meta.owner}/${snap.meta.repo}`;
 
   return {
+    caseId: caseIdOf(sha),
     repo: `${snap.meta.owner}/${snap.meta.repo}`,
     branch: snap.meta.branch,
     sha,
@@ -79,7 +88,7 @@ export function analyze(snap: RepoSnapshot, opts: AnalyzeOptions = {}): Report {
 /** 结果转纯文本，用于"复制结果"。 */
 export function reportToText(r: Report): string {
   const lines: string[] = [];
-  lines.push('纯手工代码鉴定中心 / 检测报告');
+  lines.push(`纯手工代码鉴定中心 / 检测报告 / 卷宗号 ${r.caseId}`);
   lines.push(`样本：${r.repo}@${r.sha.slice(0, 7)}（分支 ${r.branch}）`);
   lines.push('');
   lines.push(`AI Participation Score: ${r.score.toFixed(1)}%`);

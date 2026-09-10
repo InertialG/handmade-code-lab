@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { rules } from '../src/rules/index.ts';
 import { genericNames, humanSuffixNames, numberedNames } from '../src/rules/naming.ts';
-import { emptyCatch } from '../src/rules/errors.ts';
+import { emptyCatch, nestedTry } from '../src/rules/errors.ts';
 import { aiComments, todoMarkers } from '../src/rules/comments.ts';
 import { testPresence } from '../src/rules/tests.ts';
 import { aiCoauthor, conventionalCommits } from '../src/rules/commits.ts';
@@ -78,6 +78,15 @@ describe('errors', () => {
     assert.ok(vd);
     assert.ok(vd.delta < 0);
     assert.match(vd.evidence, /2 处/);
+  });
+
+  it('并列的 Python try 不算嵌套，真嵌套才算', () => {
+    const flat = 'try:\n  a()\nexcept:\n  pass\n'.repeat(3);
+    assert.deepEqual(nestedTry.run(snapshot([file('x.py', flat)])), []);
+    const nested = 'try:\n  a()\nexcept:\n  try:\n    b()\n  except:\n    try:\n      c()\n    except:\n      pass\n';
+    const [vd] = nestedTry.run(snapshot([file('x.py', nested)]));
+    assert.ok(vd && vd.delta > 0);
+    assert.match(vd.evidence, /3 层/);
   });
 });
 
@@ -157,6 +166,13 @@ describe('langs 新规则', () => {
       snapshot([file('src/a.ts', 'const SECONDS = 86400;\nconst TIMEOUT = 30000;')]),
     );
     assert.ok(vd && vd.delta < 0, `delta=${vd && vd.delta}`);
+  });
+
+  it('魔法数字跨文件计数不丢', () => {
+    const [vd] = magicNumbers.run(
+      snapshot([file('src/a.ts', 'x\n'.repeat(200) + 'const SECONDS = 86400;\n'), file('src/b.ts', 'const T = 30000;\n')]),
+    );
+    assert.match(vd!.evidence, /发现 2 处/);
   });
 });
 

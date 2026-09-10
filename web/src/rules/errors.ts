@@ -30,14 +30,18 @@ export const nestedTry: Rule = {
     let deepest = 0;
     let where = '';
     for (const f of files) {
-      let depth = 0;
+      // ponytail: 用缩进栈判嵌套。比数大括号少一半代码，且 Python 的并列 try 不再被算成嵌套
+      const stack: number[] = [];
       let max = 0;
       for (const line of f.content.split('\n')) {
-        if (/\b(try\s*\{|try\s*:)/.test(line)) {
-          depth++;
-          max = Math.max(max, depth);
-        } else if (/^\s*\}\s*(catch|finally)?/.test(line) && depth > 0) {
-          depth--;
+        const indent = line.search(/\S/);
+        if (indent === -1) continue;
+        // except/catch/finally/} 与所属 try 同缩进，是 try 的延续而不是退出
+        const handler = /^\s*(\}|except\b|catch\b|finally\b|rescue\b|ensure\b|else\b)/.test(line);
+        while (stack.length && (indent < stack[stack.length - 1]! || (indent === stack[stack.length - 1]! && !handler))) stack.pop();
+        if (/^\s*try\s*[{:]/.test(line)) {
+          stack.push(indent);
+          max = Math.max(max, stack.length);
         }
       }
       if (max > deepest) {

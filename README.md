@@ -5,7 +5,7 @@
 输入任意 GitHub 仓库地址，本中心将一本正经地列出一批完全不构成证据的"证据"，
 并给出精确到小数点后一位的 **AI 参与度**。
 
-- 不接任何模型。全部结论来自 **47 条确定性规则**,相同完整快照与相同规则版本得到相同分数。
+- 不接任何模型。全部结论来自 **46 条确定性规则**,相同完整快照与相同规则版本得到相同分数。
 - 全部分析在你的浏览器里完成。仓库代码不上传、不落库，本中心也不想看。
 - Cloudflare Worker 只做一件事：转发 GitHub 的请求并补上 CORS 头。
 
@@ -27,6 +27,7 @@ web/                   前端（Vite + TypeScript 原生，无框架，无 CSS �
   src/score.ts         计分、分档、成分表、结论模板
   test/                单元测试 + 端到端 smoke（node:test）
 worker/                Cloudflare Worker 代理（见 worker/README.md）
+server/                可选：节点端克隆并出报告（零依赖，Passenger 可托管）
 .github/workflows/     push 到 main 自动构建部署到 GitHub Pages
 ```
 
@@ -137,3 +138,17 @@ delta 建议范围：普通信号 ±3~12，强信号 ±15~20，直接命中（�
 报告不持久保存，升级时清理旧版本存储的 PAT 与报告。
 代码和提交历史固定到同一 SHA；最多采样 200 条提交，历史不完整时跳过首次提交与仓库年龄规则。
 下载上限为 50 MiB，解压上限为 100 MiB；超限中止处理。
+
+## 部署方式二：自己的节点克隆出报告
+
+`server/` 是一个零依赖的 Node 22.18+ 服务：`GET /report/:owner/:repo[?branch=]` 会浅克隆公开仓库
+（单分支、最近 200 条提交）、在节点上跑同一套规则，把报告 JSON 交给浏览器；同时静态托管 `web/dist`。
+克隆不占 GitHub API 配额，匿名也能一小时跑几十次。代价是节点会短暂持有仓库副本，做完即删。
+
+```bash
+npm run server:dev                                   # 本地 :3000，需先 VITE_SERVER_REPORT=1 npm run build
+server/deploy.sh user@host domains/xxx/public_nodejs # 构建并上传到 Passenger 托管目录
+```
+
+节点上的闸门：全局串行队列、单 IP 每小时 30 次、克隆 60 秒超时、打包超过 64 MB 拒收、同一仓库缓存 10 分钟。
+serv00 这类共享主机建站命令：`devil www add <域名> nodejs /usr/local/bin/node22 production`。
