@@ -5,7 +5,7 @@ import type { RepoRef } from './parseRepo.ts';
 import type { Report } from './analyze.ts';
 
 /**
- * Worker 代理地址。构建时通过 VITE_PROXY_BASE 注入；
+ * 服务地址前缀（留空即同源）。构建时通过 VITE_PROXY_BASE 注入；
  * 开发环境留空则走 vite.config.ts 里的 server.proxy。
  */
 export const PROXY_BASE: string = (

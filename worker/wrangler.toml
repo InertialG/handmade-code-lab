@@ -1,9 +1,0 @@
-name = "handmade-code-lab-proxy"
-main = "src/index.ts"
-compatibility_date = "2024-11-01"
-
-# 可选：限制允许的前端来源（逗号分隔）。留空或删除即允许任意来源。
-# [vars]
-# ALLOWED_ORIGINS = "https://your-name.github.io"
-
-# 不配置 GITHUB_TOKEN；代理只转发用户当前请求的 Authorization。

@@ -6,8 +6,7 @@
 并给出精确到小数点后一位的 **AI 参与度**。
 
 - 不接任何模型。全部结论来自 **46 条确定性规则**,相同完整快照与相同规则版本得到相同分数。
-- 全部分析在你的浏览器里完成。仓库代码不上传、不落库，本中心也不想看。
-- Cloudflare Worker 只做一件事：转发 GitHub 的请求并补上 CORS 头。
+- 线上由节点浅克隆公开仓库并跑规则，做完即删；浏览器只收报告。
 
 ```
 AI PARTICIPATION SCORE
@@ -26,9 +25,7 @@ web/                   前端（Vite + TypeScript 原生，无框架，无 CSS �
   src/tar.ts           tar.gz 解析（gzip 走浏览器内置 DecompressionStream）
   src/score.ts         计分、分档、成分表、结论模板
   test/                单元测试 + 端到端 smoke（node:test）
-worker/                Cloudflare Worker 代理（见 worker/README.md）
-server/                可选：节点端克隆并出报告（零依赖，Passenger 可托管）
-.github/workflows/     push 到 main 自动构建部署到 GitHub Pages
+server/                节点端克隆并出报告（零依赖，Passenger 托管，线上部署形态）
 ```
 
 ## 本地开发
@@ -40,19 +37,14 @@ npm run dev        # http://localhost:5173
 ```
 
 开发模式下 `vite.config.ts` 已经把 `/api` 与 `/tarball` 代理到 GitHub，
-**不需要**先跑 Worker。想连本地 Worker 就：
-
-```bash
-cd worker && npx wrangler dev          # :8787
-cd ../web && VITE_PROXY_BASE=http://127.0.0.1:8787 npm run dev
-```
+浏览器内分析模式可以直接跑，**不需要**任何代理服务。
 
 命令一览：
 
 | 命令 | 作用 |
 | --- | --- |
 | `npm run dev` | 开发服务器 |
-| `npm run build` | 构建到 `web/dist`（`BASE_PATH`、`VITE_PROXY_BASE` 可配） |
+| `npm run build` | 构建到 `web/dist`（`BASE_PATH`、`VITE_SERVER_REPORT` 可配） |
 | `npm test` | 跑全部测试 |
 | `npm run typecheck` | 类型检查 |
 | `npm run fixture` | 重新生成 `web/test/fixtures/sample-repo.tar.gz` |
@@ -64,21 +56,7 @@ cd ../web && VITE_PROXY_BASE=http://127.0.0.1:8787 npm run dev
 构建与测试也做了降级路径：**装了 Vite 就用 Vite 打包，没装就用 `tsc` 直出原生 ESM**
 （本项目没有任何裸模块导入，浏览器 `<script type="module">` 可以直接跑）；
 测试统一使用 Node 内置的 `node:test` + `--experimental-strip-types`，因此 `npm test` 无需安装依赖；构建的降级路径仍要求全局可用的 TypeScript 编译器。
-推荐使用 Node 22.18+ 并在 web、worker 目录分别执行 `npm ci`。
-
-## 部署
-
-**Pages**：把仓库 push 到 GitHub，在 Settings → Pages 里把 Source 选成 GitHub Actions 即可。
-在 Settings → Variables 里加一个仓库变量 `VITE_PROXY_BASE`，值是你的 Worker 地址。
-
-**Worker**：
-
-```bash
-cd worker
-npx wrangler deploy
-```
-
-细节见 [`worker/README.md`](worker/README.md)。
+推荐使用 Node 22.18+ 并在 web 目录执行 `npm ci`。
 
 ## 如何新增一条规则
 
@@ -133,13 +111,12 @@ delta 建议范围：普通信号 ±3~12，强信号 ±15~20，直接命中（�
 
 ## 安全与采样边界
 
-代理不使用部署者的 GitHub Token，不缓存响应，只开放仓库元数据和提交读取接口。
-用户 PAT 仅保留在当前页面内存中；私有仓库请求仍会经过配置的代理。
-报告不持久保存，升级时清理旧版本存储的 PAT 与报告。
+节点不持有任何 GitHub Token，只克隆公开仓库，私有仓库直接失败。
+报告按卷宗号存于节点，只含规则输出，不含仓库代码。
 代码和提交历史固定到同一 SHA；最多采样 200 条提交，历史不完整时跳过首次提交与仓库年龄规则。
 下载上限为 50 MiB，解压上限为 100 MiB；超限中止处理。
 
-## 部署方式二：自己的节点克隆出报告
+## 部署：节点克隆出报告
 
 `server/` 是一个零依赖的 Node 22.18+ 服务：`GET /report/:owner/:repo[?branch=]` 会浅克隆公开仓库
 （单分支、最近 200 条提交）、在节点上跑同一套规则，把报告 JSON 交给浏览器；同时静态托管 `web/dist`。
