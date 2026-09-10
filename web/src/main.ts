@@ -21,6 +21,7 @@ const advancedDetails = $<HTMLDetailsElement>('#advanced-details');
 const checkQuotaBtn = $<HTMLButtonElement>('#check-quota-btn');
 const quotaMsg = $<HTMLElement>('#quota-msg');
 const copyBtn = $<HTMLButtonElement>('#copy-btn');
+const imageBtn = $<HTMLButtonElement>('#image-btn');
 const againBtn = $<HTMLButtonElement>('#again-btn');
 const serialNo = $<HTMLElement>('.serial-no');
 
@@ -394,6 +395,75 @@ copyBtn.addEventListener('click', async () => {
     copyBtn.textContent = '复制失败，请手动选择';
   }
   setTimeout(() => (copyBtn.textContent = '复制结果'), 2000);
+});
+
+// ponytail: html2canvas 与二维码库都按需从 CDN 动态加载，不进打包、不算运行时依赖
+type Html2Canvas = (el: HTMLElement, opts: Record<string, unknown>) => Promise<HTMLCanvasElement>;
+type QrFactory = (type: number, level: string) => { addData(s: string): void; make(): void; createSvgTag(o: { cellSize: number; margin: number; scalable?: boolean }): string };
+const HTML2CANVAS_URL = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/+esm';
+const QR_URL = 'https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/+esm';
+
+/** 报告的分享链接：服务端模式指向卷宗，否则指向仓库。 */
+function shareLink(r: Report): string {
+  const url = new URL(location.href);
+  url.search = '';
+  url.searchParams.set(SERVER_REPORT ? 'case' : 'repo', SERVER_REPORT ? r.caseId : r.repo);
+  return url.toString();
+}
+
+/** 克隆整张纸：去掉表单、进度、按钮，末尾加二维码。截完即删。 */
+async function printSheet(r: Report): Promise<HTMLCanvasElement> {
+  const [{ default: html2canvas }, { default: qrcode }] = await Promise.all([
+    import(/* @vite-ignore */ HTML2CANVAS_URL) as Promise<{ default: Html2Canvas }>,
+    import(/* @vite-ignore */ QR_URL) as Promise<{ default: QrFactory }>,
+  ]);
+  const sheet = $<HTMLElement>('.sheet').cloneNode(true) as HTMLElement;
+  sheet.classList.add('printing');
+  for (const sel of ['form', '#error-card', '#stage-progress', '.actions']) sheet.querySelector(sel)?.remove();
+  const link = shareLink(r);
+  const qr = qrcode(0, 'M');
+  qr.addData(link);
+  qr.make();
+  const box = document.createElement('div');
+  box.className = 'qr';
+  box.innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0 });
+  const cap = document.createElement('div');
+  cap.textContent = `扫码调阅本卷宗\n${link}`;
+  box.append(cap);
+  sheet.querySelector('footer')?.before(box);
+  // 暗房：0×0 且 overflow hidden，用户看不到；html2canvas 只渲染目标子树，不受祖先裁切影响
+  const darkroom = document.createElement('div');
+  darkroom.className = 'darkroom';
+  darkroom.append(sheet);
+  document.body.append(darkroom);
+  try {
+    // windowWidth 固定成桌面视口，手机上生成的图也用桌面排版
+    return await html2canvas(sheet, { backgroundColor: '#fdfbf7', scale: 2, scrollX: 0, scrollY: -window.scrollY, windowWidth: 1000, windowHeight: 1000 });
+  } finally {
+    darkroom.remove();
+  }
+}
+
+imageBtn.addEventListener('click', async () => {
+  if (!current) return;
+  imageBtn.disabled = true;
+  imageBtn.textContent = '冲印中……';
+  try {
+    const canvas = await printSheet(current);
+    const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/png'));
+    if (!blob) throw new Error('toBlob');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${current.caseId}.png`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 60_000);
+    imageBtn.textContent = '已冲印';
+  } catch {
+    imageBtn.textContent = '冲印失败（暗房断电）';
+  } finally {
+    imageBtn.disabled = false;
+    setTimeout(() => (imageBtn.textContent = '冲印成图'), 2000);
+  }
 });
 
 againBtn.addEventListener('click', () => {
